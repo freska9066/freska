@@ -1,0 +1,1182 @@
+<!doctype html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Freska - Water Delivery</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script src="https://cdn.jsdelivr.net/npm/lucide@0.263.0/dist/umd/lucide.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; font-family: 'Outfit', sans-serif; }
+  .glass { background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.08); }
+  .glass-light { background: rgba(30, 41, 59, 0.5); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.06); }
+  .gold-glow { box-shadow: 0 0 30px rgba(234, 179, 8, 0.15); }
+  .blue-glow { box-shadow: 0 0 30px rgba(59, 130, 246, 0.2); }
+  .card-hover { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+  .card-hover:hover { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(0,0,0,0.3); }
+  .fade-in { animation: fadeIn 0.4s ease-out; }
+  .slide-up { animation: slideUp 0.5s ease-out; }
+  .slide-down { animation: slideDown 0.3s ease-out; }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes slideDown { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes pulse-gold { 0%, 100% { box-shadow: 0 0 0 0 rgba(234, 179, 8, 0.4); } 70% { box-shadow: 0 0 0 8px rgba(234, 179, 8, 0); } }
+  .pulse-gold { animation: pulse-gold 2s infinite; }
+  .notif-badge { animation: pulse-gold 2s infinite; }
+  input, select, textarea {
+    background: rgba(30, 41, 59, 0.8) !important;
+    border: 1px solid rgba(255,255,255,0.1) !important;
+    color: #e2e8f0 !important;
+    transition: border-color 0.2s;
+  }
+  input:focus, select:focus, textarea:focus {
+    border-color: rgba(59, 130, 246, 0.5) !important;
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  }
+  .scroll-area { scrollbar-width: thin; scrollbar-color: rgba(255,255,255,0.1) transparent; }
+  .scroll-area::-webkit-scrollbar { width: 4px; }
+  .scroll-area::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 4px; }
+  .tab-active { border-bottom: 2px solid #eab308; color: #eab308; }
+  .tab-inactive { border-bottom: 2px solid transparent; color: #94a3b8; }
+  .tab-inactive:hover { color: #cbd5e1; }
+  .delivery-item { transition: all 0.3s; }
+  .delivery-item:hover { background: rgba(59, 130, 246, 0.1); }
+  .toast-enter { animation: toastIn 0.4s ease-out; }
+  @keyframes toastIn { from { opacity: 0; transform: translateY(-20px) scale(0.95); } to { opacity: 1; transform: translateY(0) scale(1); } }
+  .modal-overlay { background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); }
+  </style>
+</head>
+<body class="h-full">
+<div id="app" class="h-full w-full overflow-auto scroll-area" style="background: linear-gradient(135deg, #0a0e1a 0%, #0f172a 40%, #0c1425 100%);">
+
+  <!-- Toast Container -->
+  <div id="toast-container" class="fixed top-4 right-4 z-50 flex flex-col gap-2" style="max-width: 360px;"></div>
+
+  <!-- Notification Popup -->
+  <div id="notif-popup" class="fixed inset-0 z-40 hidden modal-overlay flex items-center justify-center p-4">
+    <div class="glass rounded-2xl p-6 max-w-sm w-full slide-down" style="border: 1px solid rgba(234,179,8,0.3);">
+      <div class="flex items-center gap-3 mb-4">
+        <div class="w-10 h-10 rounded-full flex items-center justify-center" style="background: rgba(234,179,8,0.2);">
+          <i data-lucide="bell-ring" style="width:20px;height:20px;color:#eab308;"></i>
+        </div>
+        <h3 class="text-lg font-semibold text-yellow-400">Delivery Reminders</h3>
+      </div>
+      <div id="notif-list" class="space-y-2 max-h-60 overflow-auto scroll-area mb-4"></div>
+      <button onclick="closeNotif()" class="w-full py-2.5 rounded-xl font-medium text-sm" style="background: linear-gradient(135deg, #eab308, #ca8a04); color: #0f172a;">Got it</button>
+    </div>
+  </div>
+
+  <!-- Confirm Modal -->
+  <div id="confirm-modal" class="fixed inset-0 z-40 hidden modal-overlay flex items-center justify-center p-4">
+    <div class="glass rounded-2xl p-6 max-w-sm w-full slide-down">
+      <p id="confirm-msg" class="text-slate-200 mb-4 text-sm"></p>
+      <div class="flex gap-3">
+        <button id="confirm-cancel" class="flex-1 py-2.5 rounded-xl glass-light text-slate-300 text-sm font-medium">Cancel</button>
+        <button id="confirm-ok" class="flex-1 py-2.5 rounded-xl text-sm font-medium" style="background: linear-gradient(135deg, #ef4444, #dc2626); color: white;">Confirm</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Header -->
+  <header class="sticky top-0 z-30 glass" style="border-bottom: 1px solid rgba(255,255,255,0.06);">
+    <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-xl flex items-center justify-center" style="background: linear-gradient(135deg, #3b82f6, #1d4ed8);">
+          <i data-lucide="droplets" style="width:18px;height:18px;color:white;"></i>
+        </div>
+        <div>
+          <h1 class="text-base font-bold text-white leading-tight">Freska</h1>
+          <p class="text-xs text-slate-400" style="margin-top:-1px;">Premium Water Delivery</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-2">
+        <button id="notif-btn" onclick="showNotifications()" class="relative w-9 h-9 rounded-xl glass-light flex items-center justify-center card-hover">
+          <i data-lucide="bell" style="width:16px;height:16px;color:#94a3b8;"></i>
+          <span id="notif-badge" class="hidden absolute -top-1 -right-1 w-5 h-5 rounded-full text-xs font-bold flex items-center justify-center notif-badge" style="background:#eab308;color:#0f172a;"></span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Navigation Tabs -->
+  <nav class="sticky z-20 glass" style="top: 56px; border-bottom: 1px solid rgba(255,255,255,0.06); overflow-x: auto;">
+    <div class="max-w-6xl mx-auto px-4 flex gap-1 min-w-max">
+      <button onclick="switchTab('dashboard')" id="tab-dashboard" class="tab-active px-4 py-3 text-sm font-medium transition-all whitespace-nowrap">Dashboard</button>
+      <button onclick="switchTab('place')" id="tab-place" class="tab-inactive px-4 py-3 text-sm font-medium transition-all whitespace-nowrap">Place Order</button>
+      <button onclick="switchTab('customers')" id="tab-customers" class="tab-inactive px-4 py-3 text-sm font-medium transition-all whitespace-nowrap">Customers</button>
+      <button onclick="switchTab('history')" id="tab-history" class="tab-inactive px-4 py-3 text-sm font-medium transition-all whitespace-nowrap">Order History</button>
+      <button onclick="switchTab('pending')" id="tab-pending" class="tab-inactive px-4 py-3 text-sm font-medium transition-all whitespace-nowrap flex items-center gap-1">💳 Payment Pending <span id="pending-badge" class="hidden text-xs px-1.5 py-0 rounded-full font-bold" style="background:#eab308;color:#0f172a;"></span></button>
+      <button onclick="switchTab('add')" id="tab-add" class="tab-inactive px-4 py-3 text-sm font-medium transition-all whitespace-nowrap">+ New</button>
+    </div>
+  </nav>
+
+  <!-- Dashboard View -->
+  <div id="view-dashboard" class="max-w-6xl mx-auto p-4 space-y-4 fade-in">
+    <div class="mb-2">
+      <p class="text-slate-400 text-sm">Welcome back</p>
+      <h2 class="text-xl font-bold text-white">Dashboard</h2>
+    </div>
+    <div class="grid grid-cols-2 gap-3">
+      <div class="glass rounded-2xl p-4 card-hover">
+        <div class="flex items-center gap-2 mb-2">
+          <div class="w-8 h-8 rounded-lg flex items-center justify-center" style="background:rgba(59,130,246,0.2);"><i data-lucide="package" style="width:16px;height:16px;color:#3b82f6;"></i></div>
+          <span class="text-xs text-slate-400">This Month</span>
+        </div>
+        <p id="stat-month" class="text-2xl font-bold text-white">0</p>
+        <p class="text-xs text-slate-500">orders</p>
+      </div>
+      <div class="glass rounded-2xl p-4 card-hover">
+        <div class="flex items-center gap-2 mb-2">
+          <div class="w-8 h-8 rounded-lg flex items-center justify-center" style="background:rgba(234,179,8,0.2);"><i data-lucide="truck" style="width:16px;height:16px;color:#eab308;"></i></div>
+          <span class="text-xs text-slate-400">Today</span>
+        </div>
+        <p id="stat-today" class="text-2xl font-bold text-white">0</p>
+        <p class="text-xs text-slate-500">deliveries</p>
+      </div>
+      <div class="glass rounded-2xl p-4 card-hover">
+        <div class="flex items-center gap-2 mb-2">
+          <div class="w-8 h-8 rounded-lg flex items-center justify-center" style="background:rgba(16,185,129,0.2);"><i data-lucide="indian-rupee" style="width:16px;height:16px;color:#10b981;"></i></div>
+          <span class="text-xs text-slate-400">This Week</span>
+        </div>
+        <p id="stat-week" class="text-2xl font-bold text-white">0</p>
+        <p class="text-xs text-slate-500">orders</p>
+      </div>
+      <div class="glass rounded-2xl p-4 card-hover">
+        <div class="flex items-center gap-2 mb-2">
+          <div class="w-8 h-8 rounded-lg flex items-center justify-center" style="background:rgba(168,85,247,0.2);"><i data-lucide="calendar-clock" style="width:16px;height:16px;color:#a855f7;"></i></div>
+          <span class="text-xs text-slate-400">Next 7 Days</span>
+        </div>
+        <p id="stat-upcoming" class="text-2xl font-bold text-white">0</p>
+        <p class="text-xs text-slate-500">upcoming</p>
+      </div>
+    </div>
+    <div class="glass rounded-2xl p-4">
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="text-sm font-semibold text-white flex items-center gap-2"><i data-lucide="clock" style="width:14px;height:14px;color:#eab308;"></i> Today's Pending Deliveries</h3>
+        <span id="today-count" class="text-xs px-2 py-0.5 rounded-full font-medium" style="background:rgba(234,179,8,0.2);color:#eab308;">0</span>
+      </div>
+      <div id="today-list" class="space-y-2">
+        <p class="text-slate-500 text-sm text-center py-6">No deliveries scheduled for today</p>
+      </div>
+    </div>
+    <div class="glass rounded-2xl p-4">
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="text-sm font-semibold text-white flex items-center gap-2"><i data-lucide="calendar" style="width:14px;height:14px;color:#3b82f6;"></i> Upcoming (Next 7 Days)</h3>
+      </div>
+      <div id="upcoming-list" class="space-y-2">
+        <p class="text-slate-500 text-sm text-center py-6">No upcoming deliveries</p>
+      </div>
+    </div>
+    <button onclick="switchTab('add')" class="w-full py-3.5 rounded-2xl font-semibold text-sm card-hover gold-glow flex items-center justify-center gap-2" style="background: linear-gradient(135deg, #eab308, #ca8a04); color: #0f172a;">
+      <i data-lucide="plus-circle" style="width:18px;height:18px;"></i> Add New Customer
+    </button>
+  </div>
+
+  <!-- Place Order View -->
+  <div id="view-place" class="max-w-6xl mx-auto p-4 hidden">
+    <h2 class="text-xl font-bold text-white mb-6">Place New Order</h2>
+    <div class="space-y-3 mb-6">
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <button onclick="setPlaceMode('existing')" class="glass rounded-2xl p-6 card-hover text-left transition-all" id="place-existing-btn" style="border: 2px solid rgba(59,130,246,0.3);">
+          <div class="flex items-center gap-3">
+            <div class="w-12 h-12 rounded-xl flex items-center justify-center" style="background: rgba(59,130,246,0.2);"><i data-lucide="users" style="width:24px;height:24px;color:#3b82f6;"></i></div>
+            <div><p class="text-base font-semibold text-white">Existing Customer</p><p class="text-xs text-slate-400">Select from your customers</p></div>
+          </div>
+        </button>
+        <button onclick="setPlaceMode('new')" class="glass rounded-2xl p-6 card-hover text-left transition-all" id="place-new-btn">
+          <div class="flex items-center gap-3">
+            <div class="w-12 h-12 rounded-xl flex items-center justify-center" style="background: rgba(234,179,8,0.2);"><i data-lucide="user-plus" style="width:24px;height:24px;color:#eab308;"></i></div>
+            <div><p class="text-base font-semibold text-white">New Customer</p><p class="text-xs text-slate-400">Add a new customer</p></div>
+          </div>
+        </button>
+      </div>
+    </div>
+    <div id="place-existing-section" class="hidden space-y-4">
+      <div class="relative">
+        <label class="block text-xs text-slate-400 mb-2 font-medium">Select Customer *</label>
+        <input type="text" id="place-search" placeholder="Type customer name..." class="w-full px-3 py-2.5 rounded-xl text-sm" oninput="filterPlaceCustomers()">
+        <div id="place-dropdown" class="hidden absolute top-full left-0 right-0 mt-1 glass rounded-xl z-10 max-h-48 overflow-auto scroll-area" style="border: 1px solid rgba(255,255,255,0.1);">
+          <div id="place-dropdown-list" class="space-y-1 p-2"></div>
+        </div>
+      </div>
+      <div id="place-form-section" class="hidden space-y-3">
+        <div class="glass rounded-2xl p-4" style="border: 1px solid rgba(59,130,246,0.2); background: rgba(59,130,246,0.05);">
+          <div class="flex items-center gap-3">
+            <div id="place-avatar" class="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold" style="background: linear-gradient(135deg, #3b82f6, #1d4ed8); color: white;"></div>
+            <div>
+              <p id="place-selected-name" class="font-semibold text-white"></p>
+              <p id="place-selected-phone" class="text-xs text-slate-400"></p>
+            </div>
+          </div>
+        </div>
+        <form id="place-order-form" class="space-y-3" onsubmit="return false;">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs text-slate-400 mb-1 font-medium">Order Amount (₹) *</label>
+              <input type="number" id="place-amount" required min="0" class="w-full px-3 py-2.5 rounded-xl text-sm" placeholder="500">
+            </div>
+            <div>
+              <label class="block text-xs text-slate-400 mb-1 font-medium">No. of Cases *</label>
+              <input type="number" id="place-cases" required min="1" class="w-full px-3 py-2.5 rounded-xl text-sm" placeholder="3">
+            </div>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs text-slate-400 mb-1 font-medium">Delivery Date *</label>
+              <input type="date" id="place-delivery" required class="w-full px-3 py-2.5 rounded-xl text-sm">
+            </div>
+            <div>
+              <label class="block text-xs text-slate-400 mb-1 font-medium">Time Preference</label>
+              <select id="place-time" class="w-full px-3 py-2.5 rounded-xl text-sm">
+                <option value="Morning">Morning (8-12)</option>
+                <option value="Afternoon">Afternoon (12-4)</option>
+                <option value="Evening">Evening (4-8)</option>
+              </select>
+            </div>
+          </div>
+          <div>
+            <label class="block text-xs text-slate-400 mb-1 font-medium">Payment Status</label>
+            <select id="place-payment" class="w-full px-3 py-2.5 rounded-xl text-sm">
+              <option value="Pending">Pending</option>
+              <option value="Paid">Paid</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs text-slate-400 mb-1 font-medium">Special Notes</label>
+            <textarea id="place-notes" rows="2" class="w-full px-3 py-2.5 rounded-xl text-sm resize-none" placeholder="Any special instructions..."></textarea>
+          </div>
+          <div class="flex gap-3">
+            <button type="button" onclick="resetPlaceOrder()" class="flex-1 py-2.5 rounded-xl font-medium text-sm glass-light text-slate-300">Reset</button>
+            <button type="submit" id="place-submit-btn" class="flex-1 py-2.5 rounded-xl font-semibold text-sm card-hover blue-glow flex items-center justify-center gap-2" style="background: linear-gradient(135deg, #3b82f6, #1d4ed8); color: white;">
+              <i data-lucide="save" style="width:16px;height:16px;"></i> Save Order
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Customers View -->
+  <div id="view-customers" class="max-w-6xl mx-auto p-4 space-y-4 hidden">
+    <div class="flex items-center justify-between mb-2">
+      <h2 class="text-xl font-bold text-white">Customers</h2>
+      <div class="relative">
+        <input type="text" id="search-input" placeholder="Search..." class="pl-8 pr-3 py-2 rounded-xl text-sm w-40" oninput="filterCustomers()">
+        <i data-lucide="search" style="width:14px;height:14px;color:#64748b;position:absolute;left:10px;top:50%;transform:translateY(-50%);"></i>
+      </div>
+    </div>
+    <div id="customer-list" class="space-y-3">
+      <p class="text-slate-500 text-sm text-center py-10">No customers yet. Add your first one!</p>
+    </div>
+  </div>
+
+  <!-- Customer Orders Modal -->
+  <div id="customer-orders-modal" class="fixed inset-0 z-40 hidden modal-overlay overflow-auto">
+    <div class="flex items-start justify-center min-h-full p-4 pt-12">
+      <div class="glass rounded-2xl p-5 max-w-2xl w-full slide-up mb-8 max-h-96 overflow-auto scroll-area">
+        <div class="flex items-center justify-between mb-4">
+          <div>
+            <h3 id="cust-modal-title" class="text-lg font-bold text-white"></h3>
+            <p id="cust-modal-contact" class="text-xs text-slate-400 mt-0.5"></p>
+          </div>
+          <button onclick="closeCustOrders()" class="w-8 h-8 rounded-lg glass-light flex items-center justify-center flex-shrink-0">
+            <i data-lucide="x" style="width:16px;height:16px;color:#94a3b8;"></i>
+          </button>
+        </div>
+        <div id="cust-orders-list" class="space-y-2"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Order History View -->
+  <div id="view-history" class="max-w-6xl mx-auto p-4 space-y-4 hidden">
+    <div class="flex items-center justify-between mb-2">
+      <h2 class="text-xl font-bold text-white">Order History</h2>
+      <div class="relative">
+        <input type="text" id="history-search" placeholder="Search by reference..." class="pl-8 pr-3 py-2 rounded-xl text-sm w-48" oninput="filterOrderHistory()">
+        <i data-lucide="search" style="width:14px;height:14px;color:#64748b;position:absolute;left:10px;top:50%;transform:translateY(-50%);"></i>
+      </div>
+    </div>
+    <div id="history-list" class="space-y-3">
+      <p class="text-slate-500 text-sm text-center py-10">No orders in history</p>
+    </div>
+  </div>
+
+  <!-- Payment Pending View -->
+  <div id="view-pending" class="max-w-6xl mx-auto p-4 space-y-4 hidden">
+    <div class="flex items-center justify-between mb-2">
+      <h2 class="text-xl font-bold text-white">Payment Pending</h2>
+      <div class="relative">
+        <input type="text" id="pending-search" placeholder="Search by name..." class="pl-8 pr-3 py-2 rounded-xl text-sm w-48" oninput="filterPaymentPending()">
+        <i data-lucide="search" style="width:14px;height:14px;color:#64748b;position:absolute;left:10px;top:50%;transform:translateY(-50%);"></i>
+      </div>
+    </div>
+    <div id="pending-list" class="space-y-3">
+      <p class="text-slate-500 text-sm text-center py-10">No pending payments</p>
+    </div>
+  </div>
+
+  <!-- Add New Customer View -->
+  <div id="view-add" class="max-w-6xl mx-auto p-4 hidden">
+    <h2 class="text-xl font-bold text-white mb-4">New Customer Order</h2>
+    <form id="add-form" class="space-y-3" onsubmit="return false;">
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div>
+          <label class="block text-xs text-slate-400 mb-1 font-medium">Customer Name *</label>
+          <input type="text" id="f-name" required class="w-full px-3 py-2.5 rounded-xl text-sm" placeholder="Full name">
+        </div>
+        <div>
+          <label class="block text-xs text-slate-400 mb-1 font-medium">Phone *</label>
+          <input type="tel" id="f-phone" required class="w-full px-3 py-2.5 rounded-xl text-sm" placeholder="+91 9876543210">
+        </div>
+        <div>
+          <label class="block text-xs text-slate-400 mb-1 font-medium">Email</label>
+          <input type="email" id="f-email" class="w-full px-3 py-2.5 rounded-xl text-sm" placeholder="email@example.com">
+        </div>
+        <div>
+          <label class="block text-xs text-slate-400 mb-1 font-medium">Order Amount (₹) *</label>
+          <input type="number" id="f-amount" required min="0" class="w-full px-3 py-2.5 rounded-xl text-sm" placeholder="500">
+        </div>
+      </div>
+      <div>
+        <label class="block text-xs text-slate-400 mb-1 font-medium">Delivery Address *</label>
+        <input type="text" id="f-address" required class="w-full px-3 py-2.5 rounded-xl text-sm" placeholder="Full delivery address">
+      </div>
+      <div>
+        <label class="block text-xs text-slate-400 mb-1 font-medium">No. of Cases *</label>
+        <input type="number" id="f-details" required min="1" class="w-full px-3 py-2.5 rounded-xl text-sm" placeholder="e.g. 3">
+      </div>
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div>
+          <label class="block text-xs text-slate-400 mb-1 font-medium">Delivery Date *</label>
+          <input type="date" id="f-delivery" required class="w-full px-3 py-2.5 rounded-xl text-sm">
+        </div>
+        <div>
+          <label class="block text-xs text-slate-400 mb-1 font-medium">Next Delivery</label>
+          <input type="date" id="f-next" class="w-full px-3 py-2.5 rounded-xl text-sm">
+        </div>
+        <div>
+          <label class="block text-xs text-slate-400 mb-1 font-medium">Time Preference</label>
+          <select id="f-time" class="w-full px-3 py-2.5 rounded-xl text-sm">
+            <option value="Morning">Morning (8-12)</option>
+            <option value="Afternoon">Afternoon (12-4)</option>
+            <option value="Evening">Evening (4-8)</option>
+          </select>
+        </div>
+      </div>
+      <div>
+        <label class="block text-xs text-slate-400 mb-1 font-medium">Payment Status</label>
+        <select id="f-payment" class="w-full px-3 py-2.5 rounded-xl text-sm">
+          <option value="Pending">Pending</option>
+          <option value="Paid">Paid</option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-xs text-slate-400 mb-1 font-medium">Special Notes</label>
+        <textarea id="f-notes" rows="2" class="w-full px-3 py-2.5 rounded-xl text-sm resize-none" placeholder="Any special instructions..."></textarea>
+      </div>
+      <button type="submit" id="submit-btn" class="w-full py-3.5 rounded-2xl font-semibold text-sm card-hover blue-glow flex items-center justify-center gap-2" style="background: linear-gradient(135deg, #3b82f6, #1d4ed8); color: white;">
+        <i data-lucide="save" style="width:16px;height:16px;"></i> Save Customer Order
+      </button>
+    </form>
+  </div>
+
+  <!-- Customer Detail Modal -->
+  <div id="detail-modal" class="fixed inset-0 z-40 hidden modal-overlay overflow-auto">
+    <div class="flex items-start justify-center min-h-full p-4 pt-12">
+      <div class="glass rounded-2xl p-5 max-w-md w-full slide-up mb-8">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="text-lg font-bold text-white">Customer Details</h3>
+          <button onclick="closeDetail()" class="w-8 h-8 rounded-lg glass-light flex items-center justify-center">
+            <i data-lucide="x" style="width:16px;height:16px;color:#94a3b8;"></i>
+          </button>
+        </div>
+        <div id="detail-content" class="space-y-3"></div>
+        <div class="flex gap-2 mt-5">
+          <button id="detail-complete-btn" class="flex-1 py-2.5 rounded-xl text-sm font-medium flex items-center justify-center gap-1" style="background:rgba(16,185,129,0.2);color:#10b981;">
+            <i data-lucide="check-circle" style="width:14px;height:14px;"></i> Mark Delivered
+          </button>
+          <button id="detail-edit-btn" class="py-2.5 px-4 rounded-xl text-sm font-medium flex items-center justify-center gap-1" style="background:rgba(59,130,246,0.2);color:#3b82f6;">
+            <i data-lucide="edit" style="width:14px;height:14px;"></i>
+          </button>
+          <button id="detail-delete-btn" class="py-2.5 px-4 rounded-xl text-sm font-medium flex items-center justify-center gap-1" style="background:rgba(239,68,68,0.2);color:#ef4444;">
+            <i data-lucide="trash-2" style="width:14px;height:14px;"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Edit Order Modal -->
+<div id="edit-modal" class="fixed inset-0 z-40 hidden modal-overlay overflow-auto">
+  <div class="flex items-start justify-center min-h-full p-4 pt-12">
+    <div class="glass rounded-2xl p-5 max-w-md w-full slide-up mb-8">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="text-lg font-bold text-white">Edit Order</h3>
+        <button onclick="closeEditModal()" class="w-8 h-8 rounded-lg glass-light flex items-center justify-center">
+          <i data-lucide="x" style="width:16px;height:16px;color:#94a3b8;"></i>
+        </button>
+      </div>
+      <form id="edit-form" class="space-y-3" onsubmit="return false;">
+        <div>
+          <label class="block text-xs text-slate-400 mb-1 font-medium">Delivery Date *</label>
+          <input type="date" id="edit-delivery" required class="w-full px-3 py-2.5 rounded-xl text-sm">
+        </div>
+        <div>
+          <label class="block text-xs text-slate-400 mb-1 font-medium">Time Preference</label>
+          <select id="edit-time" class="w-full px-3 py-2.5 rounded-xl text-sm">
+            <option value="Morning">Morning (8-12)</option>
+            <option value="Afternoon">Afternoon (12-4)</option>
+            <option value="Evening">Evening (4-8)</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs text-slate-400 mb-1 font-medium">Payment Status</label>
+          <select id="edit-payment" class="w-full px-3 py-2.5 rounded-xl text-sm">
+            <option value="Pending">Pending</option>
+            <option value="Paid">Paid</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs text-slate-400 mb-1 font-medium">Special Notes</label>
+          <textarea id="edit-notes" rows="2" class="w-full px-3 py-2.5 rounded-xl text-sm resize-none" placeholder="Any special instructions..."></textarea>
+        </div>
+        <div class="flex gap-3">
+          <button type="button" onclick="closeEditModal()" class="flex-1 py-2.5 rounded-xl font-medium text-sm glass-light text-slate-300">Cancel</button>
+          <button type="submit" id="edit-submit-btn" class="flex-1 py-2.5 rounded-xl font-semibold text-sm card-hover blue-glow flex items-center justify-center gap-2" style="background: linear-gradient(135deg, #3b82f6, #1d4ed8); color: white;">
+            <i data-lucide="save" style="width:16px;height:16px;"></i> Save
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// LOCAL STORAGE DATA LAYER (replaces Canva's dataSdk)
+// All data is saved in the browser on each device
+// ============================================================
+const STORAGE_KEY = 'freska_orders_v1';
+
+function loadAllData() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch(e) {
+    return [];
+  }
+}
+
+function saveAllData(data) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    return true;
+  } catch(e) {
+    return false;
+  }
+}
+
+function createRecord(record) {
+  const data = loadAllData();
+  const newRecord = { ...record, __id: 'id_' + Date.now() + '_' + Math.random().toString(36).slice(2) };
+  data.push(newRecord);
+  const ok = saveAllData(data);
+  if (ok) {
+    allData = data;
+    onDataChanged();
+  }
+  return ok;
+}
+
+function updateRecord(updated) {
+  const data = loadAllData();
+  const idx = data.findIndex(d => d.__id === updated.__id);
+  if (idx === -1) return false;
+  data[idx] = updated;
+  const ok = saveAllData(data);
+  if (ok) {
+    allData = data;
+    onDataChanged();
+  }
+  return ok;
+}
+
+function deleteRecord(record) {
+  const data = loadAllData();
+  const filtered = data.filter(d => d.__id !== record.__id);
+  const ok = saveAllData(filtered);
+  if (ok) {
+    allData = filtered;
+    onDataChanged();
+  }
+  return ok;
+}
+
+// ============================================================
+// APP STATE
+// ============================================================
+let allData = loadAllData();
+let currentDetailRecord = null;
+let currentTab = 'dashboard';
+
+// ============================================================
+// HELPERS
+// ============================================================
+function getTodayDate() {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, '0');
+  const d = String(now.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+function todayStr() { return getTodayDate(); }
+
+function generateReferenceNumber() {
+  const ts = Date.now().toString(36).toUpperCase();
+  const rnd = Math.random().toString(36).substring(2, 8).toUpperCase();
+  return `ORD-${ts}-${rnd}`;
+}
+
+function isToday(dateStr) { return dateStr === todayStr(); }
+
+function isThisWeek(dateStr) {
+  const d = new Date(dateStr), now = new Date();
+  const start = new Date(now); start.setDate(now.getDate() - now.getDay());
+  const end = new Date(start); end.setDate(start.getDate() + 7);
+  return d >= start && d < end;
+}
+
+function isThisMonth(dateStr) {
+  const d = new Date(dateStr), now = new Date();
+  return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+}
+
+function isNext7Days(dateStr) {
+  const d = new Date(dateStr), now = new Date();
+  now.setHours(0,0,0,0);
+  const end = new Date(now); end.setDate(now.getDate() + 7);
+  return d > now && d <= end;
+}
+
+function formatDate(dateStr) {
+  if (!dateStr) return '—';
+  const d = new Date(dateStr);
+  return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+function showToast(msg, type='success') {
+  const c = document.getElementById('toast-container');
+  const t = document.createElement('div');
+  const colors = type === 'success' ? 'border-green-500/30 bg-green-500/10' : type === 'error' ? 'border-red-500/30 bg-red-500/10' : 'border-blue-500/30 bg-blue-500/10';
+  const textColor = type === 'success' ? 'text-green-400' : type === 'error' ? 'text-red-400' : 'text-blue-400';
+  t.className = `toast-enter glass rounded-xl px-4 py-3 ${colors} border`;
+  t.innerHTML = `<p class="text-sm font-medium ${textColor}">${msg}</p>`;
+  c.appendChild(t);
+  setTimeout(() => { t.style.opacity = '0'; t.style.transition = 'opacity 0.3s'; setTimeout(() => t.remove(), 300); }, 3000);
+}
+
+// Called whenever data changes
+function onDataChanged() {
+  renderDashboard();
+  if (currentTab === 'customers') renderCustomerList(document.getElementById('search-input')?.value || '');
+  if (currentTab === 'history') renderOrderHistory(document.getElementById('history-search')?.value || '');
+  if (currentTab === 'pending') renderPaymentPending(document.getElementById('pending-search')?.value || '');
+  updatePendingBadge();
+}
+
+// ============================================================
+// TAB SWITCHING
+// ============================================================
+function switchTab(tab) {
+  currentTab = tab;
+  ['dashboard','place','customers','history','pending','add'].forEach(t => {
+    document.getElementById('view-' + t).classList.toggle('hidden', t !== tab);
+    const btn = document.getElementById('tab-' + t);
+    btn.className = t === tab
+      ? (t === 'pending' ? 'tab-active px-4 py-3 text-sm font-medium transition-all whitespace-nowrap flex items-center gap-1' : 'tab-active px-4 py-3 text-sm font-medium transition-all whitespace-nowrap')
+      : (t === 'pending' ? 'tab-inactive px-4 py-3 text-sm font-medium transition-all whitespace-nowrap flex items-center gap-1' : 'tab-inactive px-4 py-3 text-sm font-medium transition-all whitespace-nowrap');
+  });
+  if (tab === 'customers') renderCustomerList();
+  if (tab === 'history') renderOrderHistory();
+  if (tab === 'pending') renderPaymentPending();
+  if (tab === 'place') {
+    document.getElementById('place-delivery').value = todayStr();
+    resetPlaceOrder();
+  }
+  if (tab === 'add') {
+    document.getElementById('f-delivery').value = todayStr();
+  }
+}
+
+// ============================================================
+// DASHBOARD
+// ============================================================
+function renderDashboard() {
+  const today = allData.filter(d => !d.completed && isToday(d.delivery_date));
+  const todayAll = allData.filter(d => isToday(d.delivery_date));
+  const week = allData.filter(d => isThisWeek(d.delivery_date));
+  const month = allData.filter(d => isThisMonth(d.delivery_date));
+  const upcoming = allData.filter(d => !d.completed && isNext7Days(d.delivery_date));
+
+  document.getElementById('stat-month').textContent = month.length;
+  document.getElementById('stat-today').textContent = todayAll.length;
+  document.getElementById('stat-week').textContent = week.length;
+  document.getElementById('stat-upcoming').textContent = upcoming.length;
+  document.getElementById('today-count').textContent = today.length;
+
+  const tl = document.getElementById('today-list');
+  if (today.length === 0) {
+    tl.innerHTML = '<p class="text-slate-500 text-sm text-center py-6">No deliveries scheduled for today</p>';
+  } else {
+    tl.innerHTML = today.map(d => `
+      <div class="delivery-item glass-light rounded-xl p-3 cursor-pointer" onclick="openDetail('${d.__id}')">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-3">
+            <div class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold" style="background:rgba(59,130,246,0.2);color:#3b82f6;">${(d.customer_name||'?')[0].toUpperCase()}</div>
+            <div>
+              <p class="text-sm font-medium text-white">${d.customer_name}</p>
+              <p class="text-xs text-slate-400">${d.order_details} cases • ${d.time_preference || 'Morning'}</p>
+            </div>
+          </div>
+          <div class="text-right">
+            <span class="text-xs px-2 py-0.5 rounded-full font-medium" style="background:${d.payment_status==='Paid'?'rgba(16,185,129,0.2)':'rgba(234,179,8,0.2)'};color:${d.payment_status==='Paid'?'#10b981':'#eab308'}">${d.payment_status}</span>
+            <p class="text-xs text-slate-400 mt-1">₹${d.order_amount||0}</p>
+          </div>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  const ul = document.getElementById('upcoming-list');
+  if (upcoming.length === 0) {
+    ul.innerHTML = '<p class="text-slate-500 text-sm text-center py-6">No upcoming deliveries</p>';
+  } else {
+    ul.innerHTML = upcoming.map(d => `
+      <div class="delivery-item glass-light rounded-xl p-3 cursor-pointer" onclick="openDetail('${d.__id}')">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-3">
+            <div class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold" style="background:rgba(168,85,247,0.2);color:#a855f7;">${(d.customer_name||'?')[0].toUpperCase()}</div>
+            <div>
+              <p class="text-sm font-medium text-white">${d.customer_name}</p>
+              <p class="text-xs text-slate-400">${formatDate(d.delivery_date)} • ${d.time_preference || 'Morning'}</p>
+            </div>
+          </div>
+          <span class="text-xs px-2 py-0.5 rounded-full font-medium" style="background:${d.payment_status==='Paid'?'rgba(16,185,129,0.2)':'rgba(234,179,8,0.2)'};color:${d.payment_status==='Paid'?'#10b981':'#eab308'}">${d.payment_status}</span>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  const notifs = allData.filter(d => !d.completed && (isToday(d.delivery_date) || isNext7Days(d.delivery_date)));
+  const badge = document.getElementById('notif-badge');
+  if (notifs.length > 0) { badge.textContent = notifs.length; badge.classList.remove('hidden'); }
+  else { badge.classList.add('hidden'); }
+
+  lucide.createIcons();
+}
+
+// ============================================================
+// CUSTOMERS
+// ============================================================
+function renderCustomerList(filter = '') {
+  const list = document.getElementById('customer-list');
+  const uniqueMap = new Map();
+  allData.forEach(order => {
+    if (!uniqueMap.has(order.phone)) uniqueMap.set(order.phone, order);
+  });
+  let data = Array.from(uniqueMap.values()).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+  if (filter) {
+    const f = filter.toLowerCase();
+    data = data.filter(d => (d.customer_name||'').toLowerCase().includes(f) || (d.phone||'').includes(f) || (d.address||'').toLowerCase().includes(f));
+  }
+  if (data.length === 0) {
+    list.innerHTML = `<p class="text-slate-500 text-sm text-center py-10">${filter ? 'No matches found' : 'No customers yet. Add your first one!'}</p>`;
+    return;
+  }
+  list.innerHTML = data.map(d => {
+    const custOrders = allData.filter(o => o.phone === d.phone);
+    const totalAmount = custOrders.reduce((sum, o) => sum + (o.order_amount || 0), 0);
+    const pendingCount = custOrders.filter(o => !o.completed).length;
+    return `
+      <div class="glass-light rounded-2xl p-4 card-hover cursor-pointer" onclick="showCustomerOrders('${d.phone}')">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold" style="background:linear-gradient(135deg,#3b82f6,#1d4ed8);color:white;">${(d.customer_name||'?')[0].toUpperCase()}</div>
+            <div>
+              <p class="text-sm font-semibold text-white">${d.customer_name}</p>
+              <p class="text-xs text-slate-400">${d.phone || ''} ${d.email ? '• ' + d.email : ''}</p>
+            </div>
+          </div>
+          <div class="text-right">
+            <p class="text-sm font-semibold text-white">₹${totalAmount}</p>
+            <span class="text-xs px-2 py-0.5 rounded-full font-medium inline-block mt-0.5" style="background:${pendingCount>0?'rgba(234,179,8,0.2)':'rgba(16,185,129,0.2)'};color:${pendingCount>0?'#eab308':'#10b981'}">${pendingCount} pending</span>
+          </div>
+        </div>
+        <div class="mt-2 text-xs text-slate-400"><span>${custOrders.length} order${custOrders.length !== 1 ? 's' : ''}</span></div>
+      </div>
+    `;
+  }).join('');
+  lucide.createIcons();
+}
+
+function filterCustomers() { renderCustomerList(document.getElementById('search-input').value); }
+
+function showCustomerOrders(phone) {
+  const custOrders = allData.filter(o => o.phone === phone).sort((a, b) => new Date(b.delivery_date) - new Date(a.delivery_date));
+  if (custOrders.length === 0) return;
+  const customer = custOrders[0];
+  document.getElementById('cust-modal-title').textContent = customer.customer_name;
+  document.getElementById('cust-modal-contact').textContent = `${phone}${customer.email ? ' • ' + customer.email : ''} • ${customer.address}`;
+  document.getElementById('cust-orders-list').innerHTML = custOrders.map(o => `
+    <div class="glass-light rounded-lg p-3 cursor-pointer hover:bg-slate-700/30 transition-colors" onclick="closeCustOrders(); openDetail('${o.__id}')">
+      <div class="flex items-center justify-between mb-1.5">
+        <p class="text-sm font-medium text-white">${o.reference_number || 'N/A'}</p>
+        <span class="text-xs px-2 py-0.5 rounded-full font-medium" style="background:${o.completed?'rgba(16,185,129,0.2)':'rgba(234,179,8,0.2)'};color:${o.completed?'#10b981':'#eab308'}">${o.completed?'Delivered':'Pending'}</span>
+      </div>
+      <div class="flex items-center justify-between text-xs">
+        <div class="text-slate-400">
+          <p>${o.order_details} cases • ${o.time_preference || 'Morning'}</p>
+          <p class="mt-0.5">📅 ${formatDate(o.delivery_date)}</p>
+        </div>
+        <p class="text-white font-semibold">₹${o.order_amount || 0}</p>
+      </div>
+    </div>
+  `).join('');
+  document.getElementById('customer-orders-modal').classList.remove('hidden');
+  lucide.createIcons();
+}
+function closeCustOrders() { document.getElementById('customer-orders-modal').classList.add('hidden'); }
+
+// ============================================================
+// ORDER HISTORY
+// ============================================================
+function renderOrderHistory(filter = '') {
+  const list = document.getElementById('history-list');
+  let data = [...allData].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+  if (filter) {
+    const f = filter.toLowerCase().trim();
+    data = data.filter(d => (d.reference_number||'').toLowerCase().includes(f));
+  }
+  const openOrders = data.filter(d => !d.completed);
+  const completedOrders = data.filter(d => d.completed);
+
+  const renderOrderCard = (d) => `
+    <div class="glass-light rounded-2xl p-4 card-hover cursor-pointer" onclick="openDetail('${d.__id}')">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold" style="background:linear-gradient(135deg,#3b82f6,#1d4ed8);color:white;">${(d.customer_name||'?')[0].toUpperCase()}</div>
+          <div>
+            <p class="text-sm font-semibold text-white">${d.customer_name}</p>
+            <p class="text-xs text-slate-400">${d.reference_number || 'N/A'}</p>
+          </div>
+        </div>
+        <div class="text-right">
+          <p class="text-sm font-semibold text-white">₹${d.order_amount||0}</p>
+          <div class="flex gap-1.5 justify-end mt-1 flex-wrap">
+            <span class="text-xs px-2 py-0.5 rounded-full font-medium" style="background:${d.completed?'rgba(16,185,129,0.2)':'rgba(234,179,8,0.2)'};color:${d.completed?'#10b981':'#eab308'}">${d.completed?'Delivered':'Pending'}</span>
+            <span class="text-xs px-2 py-0.5 rounded-full font-medium" style="background:${d.payment_status==='Paid'?'rgba(16,185,129,0.2)':'rgba(234,179,8,0.2)'};color:${d.payment_status==='Paid'?'#10b981':'#eab308'}">${d.payment_status==='Paid'?'Paid':'Pmt Pending'}</span>
+          </div>
+        </div>
+      </div>
+      <div class="mt-2 flex items-center gap-4 text-xs text-slate-400">
+        <span>${d.order_details} cases</span>
+        <span>📅 ${formatDate(d.delivery_date)}</span>
+      </div>
+    </div>
+  `;
+
+  if (data.length === 0) {
+    list.innerHTML = `<p class="text-slate-500 text-sm text-center py-10">${filter ? 'No orders found' : 'No orders in history'}</p>`;
+    return;
+  }
+
+  list.innerHTML = `
+    ${openOrders.length > 0 ? `
+      <div class="mb-6">
+        <div class="flex items-center justify-between mb-3">
+          <h3 class="text-sm font-semibold text-white flex items-center gap-2"><i data-lucide="package-open" style="width:14px;height:14px;color:#eab308;"></i> Open Orders</h3>
+          <span class="text-xs px-2 py-0.5 rounded-full font-medium" style="background:rgba(234,179,8,0.2);color:#eab308;">${openOrders.length}</span>
+        </div>
+        <div class="space-y-3">${openOrders.map(renderOrderCard).join('')}</div>
+      </div>` : ''}
+    ${completedOrders.length > 0 ? `
+      <div>
+        <div class="flex items-center justify-between mb-3">
+          <h3 class="text-sm font-semibold text-white flex items-center gap-2"><i data-lucide="check-circle-2" style="width:14px;height:14px;color:#10b981;"></i> Completed Orders</h3>
+          <span class="text-xs px-2 py-0.5 rounded-full font-medium" style="background:rgba(16,185,129,0.2);color:#10b981;">${completedOrders.length}</span>
+        </div>
+        <div class="space-y-3">${completedOrders.map(renderOrderCard).join('')}</div>
+      </div>` : ''}
+    ${openOrders.length === 0 && completedOrders.length === 0 ? '<p class="text-slate-500 text-sm text-center py-10">No orders found</p>' : ''}
+  `;
+  lucide.createIcons();
+}
+function filterOrderHistory() { renderOrderHistory(document.getElementById('history-search').value); }
+
+// ============================================================
+// PAYMENT PENDING
+// ============================================================
+function updatePendingBadge() {
+  const badge = document.getElementById('pending-badge');
+  const count = allData.filter(d => d.payment_status === 'Pending').length;
+  if (count > 0) { badge.textContent = count; badge.classList.remove('hidden'); }
+  else { badge.classList.add('hidden'); }
+}
+
+function renderPaymentPending(filter = '') {
+  const list = document.getElementById('pending-list');
+  let data = allData.filter(d => d.payment_status === 'Pending').sort((a, b) => new Date(b.delivery_date) - new Date(a.delivery_date));
+  if (filter) {
+    const f = filter.toLowerCase().trim();
+    data = data.filter(d => (d.customer_name||'').toLowerCase().includes(f) || (d.phone||'').includes(f));
+  }
+  if (data.length === 0) {
+    list.innerHTML = `<p class="text-slate-500 text-sm text-center py-10">${filter ? 'No matching pending payments' : 'No pending payments'}</p>`;
+    return;
+  }
+  list.innerHTML = data.map(d => `
+    <div class="glass-light rounded-2xl p-4 card-hover cursor-pointer" onclick="openDetail('${d.__id}')">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold" style="background:linear-gradient(135deg,#3b82f6,#1d4ed8);color:white;">${(d.customer_name||'?')[0].toUpperCase()}</div>
+          <div>
+            <p class="text-sm font-semibold text-white">${d.customer_name}</p>
+            <p class="text-xs text-slate-400">${d.reference_number || 'N/A'} • ${d.phone}</p>
+          </div>
+        </div>
+        <div class="text-right">
+          <p class="text-sm font-semibold text-white">₹${d.order_amount||0}</p>
+          <span class="text-xs px-2 py-0.5 rounded-full font-medium inline-block mt-0.5" style="background:rgba(234,179,8,0.2);color:#eab308;">Pending</span>
+        </div>
+      </div>
+      <div class="mt-2 flex items-center gap-4 text-xs text-slate-400">
+        <span>${d.order_details} cases</span>
+        <span>📅 ${formatDate(d.delivery_date)}</span>
+        <span>${d.completed ? '✓ Delivered' : '⏳ Pending delivery'}</span>
+      </div>
+    </div>
+  `).join('');
+  lucide.createIcons();
+}
+function filterPaymentPending() { renderPaymentPending(document.getElementById('pending-search').value); }
+
+// ============================================================
+// DETAIL MODAL
+// ============================================================
+function openDetail(id) {
+  currentDetailRecord = allData.find(d => d.__id === id);
+  if (!currentDetailRecord) return;
+  const d = currentDetailRecord;
+
+  document.getElementById('detail-content').innerHTML = `
+    <div class="flex items-center gap-3 mb-2">
+      <div class="w-12 h-12 rounded-full flex items-center justify-center text-lg font-bold" style="background:linear-gradient(135deg,#3b82f6,#1d4ed8);color:white;">${(d.customer_name||'?')[0].toUpperCase()}</div>
+      <div>
+        <p class="text-lg font-bold text-white">${d.customer_name}</p>
+        <p class="text-xs text-slate-400 font-mono">${d.reference_number || 'N/A'}</p>
+        <span class="text-xs px-2 py-0.5 rounded-full font-medium" style="background:${d.completed?'rgba(16,185,129,0.2)':'rgba(234,179,8,0.2)'};color:${d.completed?'#10b981':'#eab308'}">${d.completed?'Delivered':'Pending'}</span>
+      </div>
+    </div>
+    <div class="space-y-2 text-sm">
+      ${[
+        ['phone','Phone',d.phone],
+        ['mail','Email',d.email],
+        ['map-pin','Address',d.address],
+        ['package','Cases',d.order_details],
+        ['indian-rupee','Amount','₹'+(d.order_amount||0)],
+        ['calendar','Delivery',formatDate(d.delivery_date)],
+        ['calendar-clock','Next Delivery',formatDate(d.next_delivery_date)],
+        ['clock','Time Pref',d.time_preference],
+        ['credit-card','Payment',d.payment_status],
+        ['message-square','Notes',d.notes]
+      ].filter(r => r[2]).map(r => `
+        <div class="flex items-start gap-2 glass-light rounded-lg p-2.5">
+          <i data-lucide="${r[0]}" style="width:14px;height:14px;color:#64748b;flex-shrink:0;margin-top:2px;"></i>
+          <div><span class="text-slate-400 text-xs">${r[1]}</span><p class="text-slate-200">${r[2]}</p></div>
+        </div>
+      `).join('')}
+    </div>
+  `;
+
+  const completeBtn = document.getElementById('detail-complete-btn');
+  if (d.completed) {
+    completeBtn.innerHTML = '<i data-lucide="rotate-ccw" style="width:14px;height:14px;"></i> Undo Delivery';
+    completeBtn.style.background = 'rgba(168,85,247,0.2)';
+    completeBtn.style.color = '#a855f7';
+  } else {
+    completeBtn.innerHTML = '<i data-lucide="check-circle" style="width:14px;height:14px;"></i> Mark Delivered';
+    completeBtn.style.background = 'rgba(16,185,129,0.2)';
+    completeBtn.style.color = '#10b981';
+  }
+
+  completeBtn.onclick = () => {
+    const updated = { ...currentDetailRecord, completed: !currentDetailRecord.completed };
+    const ok = updateRecord(updated);
+    if (ok) {
+      showToast(updated.completed ? 'Marked as delivered!' : 'Delivery unmarked');
+      closeDetail();
+    } else {
+      showToast('Failed to update', 'error');
+    }
+  };
+
+  document.getElementById('detail-delete-btn').onclick = () => {
+    showConfirm(`Delete ${d.customer_name}'s order?`, () => {
+      const ok = deleteRecord(currentDetailRecord);
+      if (ok) { showToast('Order deleted'); closeDetail(); }
+      else { showToast('Failed to delete', 'error'); }
+    });
+  };
+
+  document.getElementById('detail-edit-btn').onclick = openEditModal;
+  document.getElementById('detail-modal').classList.remove('hidden');
+  lucide.createIcons();
+}
+
+function closeDetail() {
+  document.getElementById('detail-modal').classList.add('hidden');
+  currentDetailRecord = null;
+}
+
+// ============================================================
+// EDIT MODAL
+// ============================================================
+function openEditModal() {
+  if (!currentDetailRecord) return;
+  const d = currentDetailRecord;
+  document.getElementById('edit-delivery').value = d.delivery_date;
+  document.getElementById('edit-time').value = d.time_preference || 'Morning';
+  document.getElementById('edit-payment').value = d.payment_status || 'Pending';
+  document.getElementById('edit-notes').value = d.notes || '';
+  document.getElementById('edit-modal').classList.remove('hidden');
+}
+function closeEditModal() { document.getElementById('edit-modal').classList.add('hidden'); }
+
+document.getElementById('edit-form').addEventListener('submit', (e) => {
+  e.preventDefault();
+  if (!currentDetailRecord) return;
+  const updated = {
+    ...currentDetailRecord,
+    delivery_date: document.getElementById('edit-delivery').value,
+    time_preference: document.getElementById('edit-time').value,
+    payment_status: document.getElementById('edit-payment').value,
+    notes: document.getElementById('edit-notes').value.trim()
+  };
+  const ok = updateRecord(updated);
+  if (ok) {
+    showToast('Order updated!');
+    closeEditModal();
+    closeDetail();
+  } else {
+    showToast('Failed to update', 'error');
+  }
+});
+
+// ============================================================
+// CONFIRM MODAL
+// ============================================================
+let confirmCallback = null;
+function showConfirm(msg, cb) {
+  document.getElementById('confirm-msg').textContent = msg;
+  document.getElementById('confirm-modal').classList.remove('hidden');
+  confirmCallback = cb;
+}
+document.getElementById('confirm-cancel').onclick = () => document.getElementById('confirm-modal').classList.add('hidden');
+document.getElementById('confirm-ok').onclick = () => {
+  document.getElementById('confirm-modal').classList.add('hidden');
+  if (confirmCallback) confirmCallback();
+};
+
+// ============================================================
+// NOTIFICATIONS
+// ============================================================
+function showNotifications() {
+  const notifs = allData.filter(d => !d.completed && (isToday(d.delivery_date) || isNext7Days(d.delivery_date)));
+  const nl = document.getElementById('notif-list');
+  if (notifs.length === 0) {
+    nl.innerHTML = '<p class="text-slate-400 text-sm">No upcoming deliveries</p>';
+  } else {
+    nl.innerHTML = notifs.map(d => `
+      <div class="glass-light rounded-lg p-2.5 flex items-center gap-2">
+        <div class="w-2 h-2 rounded-full flex-shrink-0" style="background:${isToday(d.delivery_date)?'#ef4444':'#eab308'}"></div>
+        <div>
+          <p class="text-sm text-white font-medium">${d.customer_name}</p>
+          <p class="text-xs text-slate-400">${isToday(d.delivery_date)?'Due today':formatDate(d.delivery_date)} • ${d.time_preference||'Morning'}</p>
+        </div>
+      </div>
+    `).join('');
+  }
+  document.getElementById('notif-popup').classList.remove('hidden');
+  lucide.createIcons();
+}
+function closeNotif() { document.getElementById('notif-popup').classList.add('hidden'); }
+
+// ============================================================
+// ADD NEW CUSTOMER FORM
+// ============================================================
+document.getElementById('f-delivery').value = todayStr();
+
+document.getElementById('add-form').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const btn = document.getElementById('submit-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="inline-block w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></span> Saving...';
+
+  const record = {
+    customer_name: document.getElementById('f-name').value.trim(),
+    phone: document.getElementById('f-phone').value.trim(),
+    email: document.getElementById('f-email').value.trim(),
+    address: document.getElementById('f-address').value.trim(),
+    order_details: document.getElementById('f-details').value.trim(),
+    order_amount: parseFloat(document.getElementById('f-amount').value) || 0,
+    delivery_date: document.getElementById('f-delivery').value,
+    next_delivery_date: document.getElementById('f-next').value || '',
+    time_preference: document.getElementById('f-time').value,
+    payment_status: document.getElementById('f-payment').value,
+    notes: document.getElementById('f-notes').value.trim(),
+    completed: false,
+    created_at: new Date().toISOString(),
+    reference_number: generateReferenceNumber()
+  };
+
+  const ok = createRecord(record);
+  btn.disabled = false;
+  btn.innerHTML = '<i data-lucide="save" style="width:16px;height:16px;"></i> Save Customer Order';
+  lucide.createIcons();
+
+  if (ok) {
+    showToast('Customer order saved!');
+    document.getElementById('add-form').reset();
+    document.getElementById('f-delivery').value = todayStr();
+    switchTab('dashboard');
+  } else {
+    showToast('Failed to save. Please try again.', 'error');
+  }
+});
+
+// ============================================================
+// PLACE ORDER (EXISTING CUSTOMER)
+// ============================================================
+let selectedPlaceCustomer = null;
+
+function setPlaceMode(mode) {
+  document.getElementById('place-existing-btn').style.borderColor = mode === 'existing' ? 'rgba(59,130,246,0.5)' : 'rgba(255,255,255,0.1)';
+  document.getElementById('place-new-btn').style.borderColor = mode === 'new' ? 'rgba(234,179,8,0.3)' : 'rgba(255,255,255,0.1)';
+  if (mode === 'new') {
+    document.getElementById('place-existing-section').classList.add('hidden');
+    switchTab('add');
+  } else {
+    document.getElementById('place-existing-section').classList.remove('hidden');
+    document.getElementById('place-search').focus();
+    filterPlaceCustomers();
+  }
+}
+
+function filterPlaceCustomers() {
+  const search = document.getElementById('place-search').value.toLowerCase().trim();
+  const dropdown = document.getElementById('place-dropdown');
+  const list = document.getElementById('place-dropdown-list');
+  if (!search) { dropdown.classList.add('hidden'); return; }
+
+  // Get unique customers
+  const uniqueMap = new Map();
+  allData.forEach(o => { if (!uniqueMap.has(o.phone)) uniqueMap.set(o.phone, o); });
+  const filtered = Array.from(uniqueMap.values()).filter(d =>
+    (d.customer_name||'').toLowerCase().includes(search) || (d.phone||'').includes(search)
+  );
+
+  if (filtered.length === 0) {
+    list.innerHTML = '<p class="text-slate-400 text-sm p-2">No customers found</p>';
+    dropdown.classList.remove('hidden');
+    return;
+  }
+  list.innerHTML = filtered.map(d => `
+    <button type="button" onclick="selectPlaceCustomer('${d.__id}')" class="w-full text-left p-2 hover:bg-slate-700/30 rounded-lg transition-colors">
+      <p class="text-sm font-medium text-white">${d.customer_name}</p>
+      <p class="text-xs text-slate-400">${d.phone} • ${d.address}</p>
+    </button>
+  `).join('');
+  dropdown.classList.remove('hidden');
+}
+
+function selectPlaceCustomer(id) {
+  selectedPlaceCustomer = allData.find(d => d.__id === id);
+  if (!selectedPlaceCustomer) return;
+  const d = selectedPlaceCustomer;
+  document.getElementById('place-search').value = d.customer_name;
+  document.getElementById('place-dropdown').classList.add('hidden');
+  document.getElementById('place-avatar').textContent = (d.customer_name||'?')[0].toUpperCase();
+  document.getElementById('place-selected-name').textContent = d.customer_name;
+  document.getElementById('place-selected-phone').textContent = d.phone + (d.email ? ' • ' + d.email : '');
+  document.getElementById('place-form-section').classList.remove('hidden');
+  document.getElementById('place-amount').value = '';
+  document.getElementById('place-cases').value = '';
+  document.getElementById('place-delivery').value = todayStr();
+  document.getElementById('place-time').value = 'Morning';
+  document.getElementById('place-payment').value = 'Pending';
+  document.getElementById('place-notes').value = '';
+}
+
+function resetPlaceOrder() {
+  selectedPlaceCustomer = null;
+  document.getElementById('place-search').value = '';
+  document.getElementById('place-dropdown').classList.add('hidden');
+  document.getElementById('place-form-section').classList.add('hidden');
+  document.getElementById('place-existing-section').classList.add('hidden');
+  document.getElementById('place-existing-btn').style.borderColor = 'rgba(59,130,246,0.3)';
+  document.getElementById('place-new-btn').style.borderColor = 'rgba(255,255,255,0.1)';
+}
+
+document.getElementById('place-order-form').addEventListener('submit', (e) => {
+  e.preventDefault();
+  if (!selectedPlaceCustomer) { showToast('Please select a customer', 'error'); return; }
+
+  const btn = document.getElementById('place-submit-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="inline-block w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>';
+
+  const record = {
+    customer_name: selectedPlaceCustomer.customer_name,
+    phone: selectedPlaceCustomer.phone,
+    email: selectedPlaceCustomer.email,
+    address: selectedPlaceCustomer.address,
+    order_details: document.getElementById('place-cases').value.trim(),
+    order_amount: parseFloat(document.getElementById('place-amount').value) || 0,
+    delivery_date: document.getElementById('place-delivery').value,
+    next_delivery_date: '',
+    time_preference: document.getElementById('place-time').value,
+    payment_status: document.getElementById('place-payment').value,
+    notes: document.getElementById('place-notes').value.trim(),
+    completed: false,
+    created_at: new Date().toISOString(),
+    reference_number: generateReferenceNumber()
+  };
+
+  const ok = createRecord(record);
+  btn.disabled = false;
+  btn.innerHTML = '<i data-lucide="save" style="width:16px;height:16px;"></i> Save Order';
+  lucide.createIcons();
+
+  if (ok) {
+    showToast('Order placed successfully!');
+    resetPlaceOrder();
+    switchTab('dashboard');
+  } else {
+    showToast('Failed to save order. Please try again.', 'error');
+  }
+});
+
+// ============================================================
+// INIT
+// ============================================================
+onDataChanged();
+lucide.createIcons();
+</script>
+</body>
+</html>
